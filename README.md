@@ -4,7 +4,7 @@
 
 基于ollama.js构建的本地大模型对话助手
 
-<img src="http://192.168.1.229:9902/front-end/ollama-chat/raw/master/src/assets/interface.png"  />
+<img src="https://raw.githubusercontent.com/liu-ziting/ollama-chat/main/src/assets/interface.png"  />
 
 ## 框架
 
