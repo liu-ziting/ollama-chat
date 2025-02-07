@@ -89,8 +89,6 @@ interface ChatMessage {
     message?: string
     displayedMessage: string
     created_at: string
-    thinkingProcess?: string // 新增思考过程字段
-    finalAnswer?: string // 新增最终答案字段
 }
 
 // 会话类型定义

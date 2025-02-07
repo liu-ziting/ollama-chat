@@ -3,6 +3,9 @@ import { onUpdated, watch } from 'vue'
 import { useChat } from '@/lib/useChat'
 import { UserOutlined } from '@ant-design/icons-vue'
 import ollamaIcon from '@/assets/ollama.png'
+import { Collapse } from 'ant-design-vue'
+const { Panel } = Collapse
+
 // 用于渲染Markdown
 import MarkdownIt from 'markdown-it'
 const md = new MarkdownIt()
@@ -27,6 +30,19 @@ watch(
 const renderMarkdown = markdown => {
     return md.render(markdown)
 }
+
+// 解析消息内容，提取思考过程
+const parseMessageContent = (content: string) => {
+    const thinkStart = content.indexOf('<think>')
+    const thinkEnd = content.indexOf('</think>')
+
+    if (thinkStart !== -1 && thinkEnd !== -1) {
+        const thinkContent = content.slice(thinkStart + 7, thinkEnd)
+        const mainContent = content.slice(thinkEnd + 8)
+        return { thinkContent, mainContent }
+    }
+    return { thinkContent: null, mainContent: content }
+}
 </script>
 
 <template>
@@ -44,18 +60,23 @@ const renderMarkdown = markdown => {
                             </strong>
                         </template>
                         <template #description>
-                            <div class="message" v-html="renderMarkdown(chatMessage.displayedMessage)"></div>
+                            <div class="message">
+                                <template v-if="parseMessageContent(chatMessage.displayedMessage).thinkContent">
+                                    <Collapse class="thinking-collapse">
+                                        <Panel key="1" header="思考过程">
+                                            <div class="thinking-process" v-html="renderMarkdown(parseMessageContent(chatMessage.displayedMessage).thinkContent)"></div>
+                                        </Panel>
+                                    </Collapse>
+                                    <div v-html="renderMarkdown(parseMessageContent(chatMessage.displayedMessage).mainContent)"></div>
+                                </template>
+                                <template v-else>
+                                    <div v-html="renderMarkdown(chatMessage.displayedMessage)"></div>
+                                </template>
+                            </div>
                             <time>{{ chatMessage.created_at }}</time>
                         </template>
                         <template #avatar>
-                            <a-avatar
-                                class="avatar"
-                                :style="
-                                    chatMessage.role === 'user'
-                                        ? 'backgroundColor: #0C0A09'
-                                        : 'backgroundColor: #ffffff'
-                                "
-                            >
+                            <a-avatar class="avatar" :style="chatMessage.role === 'user' ? 'backgroundColor: #0C0A09' : 'backgroundColor: #ffffff'">
                                 <template #icon>
                                     <UserOutlined v-if="chatMessage.role === 'user'" />
                                     <img :src="ollamaIcon" v-else />
@@ -98,5 +119,15 @@ const renderMarkdown = markdown => {
 
         background-color: #fff;
     }
+    .thinking-collapse {
+        margin-bottom: 10px;
+        .thinking-process {
+            font-size: 12px;
+            color: #666;
+        }
+    }
+}
+::v-deep .ant-collapse-content-box {
+    padding: 10px !important;
 }
 </style>
