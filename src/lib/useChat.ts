@@ -89,6 +89,8 @@ interface ChatMessage {
     message?: string
     displayedMessage: string
     created_at: string
+    thinkingProcess?: string // 新增思考过程字段
+    finalAnswer?: string // 新增最终答案字段
 }
 
 // 会话类型定义
@@ -172,89 +174,73 @@ const scrollChatHistoryToBottom = () => {
     }, 100)
 }
 
-// 从 Ollama 获取聊天回复
 const getChatResponse = async () => {
     if (!chatValue.value.trim() || !currentSessionId.value) {
         return
     }
 
-    // 确保请求被发送到当前活动的会话
     const activeSessionId = currentSessionId.value
 
+    // 添加用户消息
     const newMessage: ChatMessage = {
         role: 'user',
         message: chatValue.value,
         displayedMessage: chatValue.value,
         created_at: formatIsoTimeString(new Date().toISOString())
     }
-
-    // 将用户消息添加到当前活动的会话
     chatSessions[activeSessionId].messages.push(newMessage)
     scrollChatHistoryToBottom()
 
-    // 清空输入框
-    const chat = chatValue.value
+    // 保存用户输入并清空
+    const userMessage = chatValue.value
     chatValue.value = ''
 
-    // 添加临时的“思考中…”消息到当前活动的会话
-    const tempResponseMessage: ChatMessage = {
+    // 创建临时流式响应消息
+    const streamResponseMessage: ChatMessage = {
         role: 'ollama',
         model: model.value,
         message: '',
-        displayedMessage: '模型思考中…',
+        displayedMessage: '',
         created_at: formatIsoTimeString(new Date().toISOString())
     }
-    chatSessions[activeSessionId].messages.push(tempResponseMessage)
+    chatSessions[activeSessionId].messages.push(streamResponseMessage)
+    const responseIndex = chatSessions[activeSessionId].messages.length - 1
 
     try {
-        const response = await ollama.chat({
+        const responseStream = await ollama.chat({
             model: model.value,
-            messages: [{ role: 'user', content: chat }]
+            messages: [{ role: 'user', content: userMessage }],
+            stream: true // 启用流式传输
         })
 
-        // 移除临时的“思考中…”消息
-        const sessionMessages = chatSessions[activeSessionId].messages
-        sessionMessages.splice(sessionMessages.length - 1, 1)
-
-        // 添加新的 Ollama 回复消息到初始的活动会话
-        const responseMessage: ChatMessage = {
-            role: 'ollama',
-            message: response.message.content,
-            displayedMessage: response.message.content,
-            model: response.model,
-            created_at: formatIsoTimeString(response.created_at)
+        let fullResponse = ''
+        for await (const chunk of responseStream) {
+            if (chunk.message?.content) {
+                fullResponse += chunk.message.content
+                // 直接更新消息内容
+                streamResponseMessage.message = fullResponse
+                streamResponseMessage.displayedMessage = fullResponse
+                // 触发响应式更新
+                chatSessions[activeSessionId].messages[responseIndex] = { ...streamResponseMessage }
+                scrollChatHistoryToBottom()
+            }
         }
-        sessionMessages.push(responseMessage)
 
-        // 调用模拟打字效果函数
-        await simulateTyping(response.message.content, sessionMessages[sessionMessages.length - 1])
+        // 流结束后更新最终消息
+        streamResponseMessage.created_at = formatIsoTimeString(new Date().toISOString())
+        streamResponseMessage.model = model.value
     } catch (error) {
-        // 处理错误情况（例如，从Ollama API 获取响应失败）
-        console.error('Failed to get chat response:', error)
-        // 移除思考中…消息
-        const sessionMessages = chatSessions[activeSessionId].messages
-        sessionMessages.splice(sessionMessages.length - 1, 1)
-        // 可以选择添加错误消息到会话
-        sessionMessages.push({
+        console.error('流式请求失败:', error)
+        // 移除临时消息并显示错误
+        chatSessions[activeSessionId].messages.splice(responseIndex, 1)
+        chatSessions[activeSessionId].messages.push({
             role: 'error',
-            displayedMessage: '无法获取回复，请稍后重试。',
+            displayedMessage: '请求失败: ' + error.message,
             created_at: formatIsoTimeString(new Date().toISOString())
         })
     } finally {
-        // 无论请求成功还是失败，都应确保滚动到最新的消息
         scrollChatHistoryToBottom()
     }
-}
-
-// 模拟打字效果辅助函数
-// message为完整消息，displayingMessage为当前会话Ollama消息对象的displayedMessage属性
-const simulateTyping = async (message, displayingMessage) => {
-    for (let i = 0; i <= message.length; i++) {
-        displayingMessage.displayedMessage = message.substring(0, i)
-        await new Promise(resolve => setTimeout(resolve, 100)) // 调整速度
-        // 强制更新UI的方法（根据使用的框架不同可能会有所差异）
-    }
-    scrollChatHistoryToBottom() // 确保聊天历史滚动到底部
 }
 
 // 清空聊天历史
