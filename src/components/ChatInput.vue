@@ -24,7 +24,7 @@ document.addEventListener('keydown', event => {
 .chat-input {
     background-color: #fff;
     border: none;
-    height: 100% !important;
+    height: calc(100% - 60px) !important;
     border-radius: 0;
 }
 .chat-input:focus {

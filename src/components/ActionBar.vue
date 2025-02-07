@@ -32,7 +32,7 @@ const modelChange = e => {
             </template>
         </a-dropdown>
         <a-button type="text" title="图片" disabled class="icon-btn"> <PictureOutlined class="icon" /></a-button>
-        <a-button type="text" title="插件" disabled class="icon-btn"> <ReadOutlined class="icon" /></a-button>
+        <a-button type="text" title="知识库" disabled class="icon-btn"> <ReadOutlined class="icon" /></a-button>
     </div>
 </template>
 

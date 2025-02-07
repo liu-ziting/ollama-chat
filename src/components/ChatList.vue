@@ -3,16 +3,7 @@ import { onBeforeUnmount } from 'vue'
 import { useChat } from '@/lib/useChat'
 import { MoreOutlined } from '@ant-design/icons-vue'
 
-const {
-    title,
-    createNewSession,
-    switchSession,
-    chatSessions,
-    currentSessionId,
-    deleteSession,
-    duplicateSession,
-    saveChatSessions
-} = useChat()
+const { title, createNewSession, switchSession, chatSessions, currentSessionId, deleteSession, duplicateSession, saveChatSessions } = useChat()
 
 onBeforeUnmount(() => {
     saveChatSessions()
@@ -24,20 +15,13 @@ onBeforeUnmount(() => {
         <h1>{{ title }}</h1>
         <a-button class="chat-add" @click="createNewSession">新建对话</a-button>
         <div class="chat-list">
-            <div
-                v-for="(session, sessionId) in chatSessions"
-                :key="sessionId"
-                @click="switchSession(sessionId)"
-                :class="{ active: currentSessionId === sessionId }"
-            >
+            <div v-for="(session, sessionId) in chatSessions" :key="sessionId" @click="switchSession(sessionId)" :class="{ active: currentSessionId === sessionId }">
                 <h2>{{ session.messages.slice(-1)[0].displayedMessage }}</h2>
                 <p>
                     {{ session.messages[0].created_at }}
                 </p>
                 <!-- <p>{{ `${sessionId}` }}</p> -->
-                <a-tag v-if="currentSessionId === sessionId">{{
-                    currentSessionId === sessionId ? '当前会话' : ''
-                }}</a-tag>
+                <a-tag v-if="currentSessionId === sessionId">{{ currentSessionId === sessionId ? '当前会话' : '' }}</a-tag>
                 <a-dropdown>
                     <MoreOutlined class="more-icon" />
                     <template #overlay>
