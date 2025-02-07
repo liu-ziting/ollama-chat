@@ -1,9 +1,65 @@
+<template>
+    <div class="chat-history">
+        <a-list item-layout="horizontal" :data-source="currentChatHistory">
+            <template #loadMore>
+                <!-- 加载更多对话按钮 -->
+            </template>
+            <template #renderItem="{ item: chatMessage }">
+                <a-list-item :class="chatMessage.role">
+                    <a-list-item-meta>
+                        <template #title>
+                            <strong>
+                                {{ chatMessage.role === 'user' ? 'User' : chatMessage.model || 'Ollama' }}
+                            </strong>
+                        </template>
+                        <template #description>
+                            <div class="message">
+                                <!-- 判断是否有思考过程 -->
+                                <template v-if="parseMessageContent(chatMessage.displayedMessage).thinkContent">
+                                    <Collapse v-if="parseMessageContent(chatMessage.displayedMessage).thinkContent.trim()" class="thinking-collapse" :bordered="false">
+                                        <Panel key="1" header="深度思考">
+                                            <div class="thinking-process" v-html="renderMarkdown(parseMessageContent(chatMessage.displayedMessage).thinkContent)"></div>
+                                        </Panel>
+                                    </Collapse>
+                                </template>
+
+                                <!-- 渲染 Markdown 和 代码 -->
+                                <template v-for="(part, index) in splitContent(parseMessageContent(chatMessage.displayedMessage).mainContent)" :key="index">
+                                    <!-- 渲染 Markdown 内容 -->
+                                    <template v-if="part.type === 'markdown'">
+                                        <div v-html="renderMarkdown(part.content)"></div>
+                                    </template>
+
+                                    <!-- 渲染 代码块 -->
+                                    <template v-if="part.type === 'code'">
+                                        <CodeBlock :code="part.content" :language="detectLanguage(part.content)" />
+                                    </template>
+                                </template>
+                            </div>
+                            <time>{{ chatMessage.created_at }}</time>
+                        </template>
+                        <template #avatar>
+                            <a-avatar class="avatar" :style="chatMessage.role === 'user' ? 'backgroundColor: #0C0A09' : 'backgroundColor: #ffffff'">
+                                <template #icon>
+                                    <UserOutlined v-if="chatMessage.role === 'user'" />
+                                    <img :src="ollamaIcon" v-else />
+                                </template>
+                            </a-avatar>
+                        </template>
+                    </a-list-item-meta>
+                </a-list-item>
+            </template>
+        </a-list>
+    </div>
+</template>
+
 <script setup lang="ts">
 import { onUpdated, watch } from 'vue'
 import { useChat } from '@/lib/useChat'
 import { UserOutlined } from '@ant-design/icons-vue'
 import ollamaIcon from '@/assets/ollama.png'
 import { Collapse } from 'ant-design-vue'
+import CodeBlock from '@/components/CodeBlock.vue'
 const { Panel } = Collapse
 
 // 用于渲染Markdown
@@ -43,54 +99,56 @@ const parseMessageContent = (content: string) => {
     }
     return { thinkContent: null, mainContent: content }
 }
+
+// 检测代码语言
+const detectLanguage = (content: string) => {
+    if (content.startsWith('```')) {
+        const language = content.split('\n')[0].replace(/```/, '').trim()
+        return language || 'javascript'
+    }
+    return 'javascript'
+}
+
+// 分割混合内容为 Markdown 和 Code
+const splitContent = (content: string) => {
+    const parts = []
+    const codeBlockRegex = /```([\s\S]*?)```|~~~([\s\S]*?)~~~/g // 匹配代码块
+    let lastIndex = 0
+
+    // 查找所有代码块
+    content.replace(codeBlockRegex, (match, p1, p2, offset) => {
+        // 添加代码块之前的 Markdown 内容
+        if (offset > lastIndex) {
+            parts.push({
+                type: 'markdown',
+                content: content.slice(lastIndex, offset)
+            })
+        }
+
+        // 添加代码块
+        const codeContent = p1 || p2
+        parts.push({
+            type: 'code',
+            content: codeContent
+        })
+
+        lastIndex = offset + match.length
+        return match
+    })
+
+    // 添加剩余的 Markdown 内容
+    if (lastIndex < content.length) {
+        parts.push({
+            type: 'markdown',
+            content: content.slice(lastIndex)
+        })
+    }
+
+    return parts
+}
 </script>
 
-<template>
-    <div class="chat-history">
-        <a-list item-layout="horizontal" :data-source="currentChatHistory">
-            <template #loadMore>
-                <!-- 加载更多对话按钮 -->
-            </template>
-            <template #renderItem="{ item: chatMessage }">
-                <a-list-item :class="chatMessage.role">
-                    <a-list-item-meta>
-                        <template #title>
-                            <strong>
-                                {{ chatMessage.role === 'user' ? 'User' : chatMessage.model || 'Ollama' }}
-                            </strong>
-                        </template>
-                        <template #description>
-                            <div class="message">
-                                <template v-if="parseMessageContent(chatMessage.displayedMessage).thinkContent">
-                                    <Collapse class="thinking-collapse">
-                                        <Panel key="1" header="思考过程">
-                                            <div class="thinking-process" v-html="renderMarkdown(parseMessageContent(chatMessage.displayedMessage).thinkContent)"></div>
-                                        </Panel>
-                                    </Collapse>
-                                    <div v-html="renderMarkdown(parseMessageContent(chatMessage.displayedMessage).mainContent)"></div>
-                                </template>
-                                <template v-else>
-                                    <div v-html="renderMarkdown(chatMessage.displayedMessage)"></div>
-                                </template>
-                            </div>
-                            <time>{{ chatMessage.created_at }}</time>
-                        </template>
-                        <template #avatar>
-                            <a-avatar class="avatar" :style="chatMessage.role === 'user' ? 'backgroundColor: #0C0A09' : 'backgroundColor: #ffffff'">
-                                <template #icon>
-                                    <UserOutlined v-if="chatMessage.role === 'user'" />
-                                    <img :src="ollamaIcon" v-else />
-                                </template>
-                            </a-avatar>
-                        </template>
-                    </a-list-item-meta>
-                </a-list-item>
-            </template>
-        </a-list>
-    </div>
-</template>
-
-<style lang="scss" scoped>
+<style scoped lang="scss">
 .chat-history {
     padding-top: 55px;
     .message {
