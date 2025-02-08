@@ -227,24 +227,14 @@ const getChatResponse = async () => {
     // 获取当前的提示词
     const currentPrompt = prompt.value.trim()
 
-    // 获取当前会话的所有消息作为上下文
-    const contextMessages = chatSessions[activeSessionId].messages.map(msg => ({
-        role: msg.role,
-        content: msg.message || msg.displayedMessage
-    }))
-
-    // 将用户的消息和提示词加入上下文
-    const messagesToSend = [
-        { role: 'system', content: currentPrompt }, // 加入提示词
-        ...contextMessages, // 加入会话历史上下文
-        { role: 'user', content: userMessage } // 添加当前用户消息
-    ]
-
     try {
         // 请求上下文格式
         const responseStream = await ollama.chat({
             model: model.value,
-            messages: messagesToSend,
+            messages: [
+                { role: 'system', content: currentPrompt }, // 加入提示词
+                { role: 'user', content: userMessage }
+            ],
             stream: true // 启用流式传输
         })
 
