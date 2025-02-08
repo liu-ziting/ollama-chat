@@ -7,7 +7,7 @@ const title = ref('ollamaChat')
 
 const chatValue = ref('')
 const model = ref('')
-const ollamaHost = ref(localStorage.getItem('ollamaHost') || 'http://localhost:11434')
+const ollamaHost = ref(localStorage.getItem('ollamaHost') || 'http://127.0.0.1:11434')
 const chatHistory = ref(localStorage.getItem('chatHistory') ? JSON.parse(localStorage.getItem('chatHistory')) : [])
 const models = ref([])
 let ollama = new Ollama({ host: ollamaHost.value })
@@ -172,6 +172,26 @@ const scrollChatHistoryToBottom = () => {
     }, 100)
 }
 
+// 新增：提示词状态
+const prompt = ref('')
+
+// 设置提示词的方法
+const setPrompt = (newPrompt: string) => {
+    prompt.value = newPrompt
+    localStorage.setItem('prompt', newPrompt) // 保存到本地存储
+}
+
+// 加载提示词
+const loadPrompt = () => {
+    const savedPrompt = localStorage.getItem('prompt')
+    if (savedPrompt) {
+        prompt.value = savedPrompt
+    }
+}
+
+// 初始化加载提示词
+loadPrompt()
+
 const getChatResponse = async () => {
     if (!chatValue.value.trim() || !currentSessionId.value) {
         return
@@ -204,10 +224,27 @@ const getChatResponse = async () => {
     chatSessions[activeSessionId].messages.push(streamResponseMessage)
     const responseIndex = chatSessions[activeSessionId].messages.length - 1
 
+    // 获取当前的提示词
+    const currentPrompt = prompt.value.trim()
+
+    // 获取当前会话的所有消息作为上下文
+    const contextMessages = chatSessions[activeSessionId].messages.map(msg => ({
+        role: msg.role,
+        content: msg.message || msg.displayedMessage
+    }))
+
+    // 将用户的消息和提示词加入上下文
+    const messagesToSend = [
+        { role: 'system', content: currentPrompt }, // 加入提示词
+        ...contextMessages, // 加入会话历史上下文
+        { role: 'user', content: userMessage } // 添加当前用户消息
+    ]
+
     try {
+        // 请求上下文格式
         const responseStream = await ollama.chat({
             model: model.value,
-            messages: [{ role: 'user', content: userMessage }],
+            messages: messagesToSend,
             stream: true // 启用流式传输
         })
 
@@ -331,6 +368,8 @@ export function useChat() {
         formatIsoTimeString,
         saveConfig,
         loadConfig,
-        setOllamaHost
+        setOllamaHost,
+        prompt,
+        setPrompt
     }
 }
